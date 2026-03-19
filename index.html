@@ -129,6 +129,24 @@
     box-shadow: 0 1px 3px rgba(0,0,0,.3);
   }
 
+  /* ── PHOTO STRIP ──────────────────────────────────────────────────────────── */
+  .photo-strip { display:flex; gap:3px; margin-bottom:8px; border-radius:6px; overflow:hidden; }
+  .photo-strip img { width:88px; height:66px; object-fit:cover; cursor:zoom-in; flex:1;
+                     transition:opacity .15s; }
+  .photo-strip img:hover { opacity:.85; }
+
+  /* ── LIGHTBOX ─────────────────────────────────────────────────────────────── */
+  #lb { display:none; position:fixed; inset:0; background:rgba(0,0,0,.88);
+        z-index:99999; align-items:center; justify-content:center; cursor:zoom-out;
+        flex-direction:column; gap:12px; }
+  #lb.open { display:flex; }
+  #lb img { max-width:92vw; max-height:85vh; border-radius:8px;
+             box-shadow:0 8px 50px rgba(0,0,0,.6); }
+  #lb-caption { color:#ddd; font-size:12px; font-family:Arial,sans-serif; }
+  #lb-close { position:fixed; top:16px; right:20px; color:#fff; font-size:28px;
+               cursor:pointer; line-height:1; font-family:Arial,sans-serif; opacity:.8; }
+  #lb-close:hover { opacity:1; }
+
   /* ── GA NOTICE ────────────────────────────────────────────────────────────── */
   .ga-notice {
     background: #fffbeb; border: 1.5px dashed var(--amber);
@@ -138,6 +156,13 @@
 </style>
 </head>
 <body>
+
+<!-- ── LIGHTBOX ─────────────────────────────────────────────────────────────── -->
+<div id="lb" onclick="closeLB()">
+  <span id="lb-close" onclick="closeLB()">✕</span>
+  <img id="lb-img" src="" alt="">
+  <div id="lb-caption"></div>
+</div>
 
 <!-- ── SIDEBAR ──────────────────────────────────────────────────────────────── -->
 <div id="sidebar">
@@ -266,6 +291,41 @@ const HOUSES = [
     murl:'https://maps.google.com/?q=11333+Walsingham+Rd,Seminole,FL' },
 ];
 
+// ── PHOTOS ───────────────────────────────────────────────────────────────────
+// [p1=front/main, p2=exterior/side, p3=interior]  — live Zillow CDN
+const PHOTOS = {
+  1:  ['https://photos.zillowstatic.com/fp/aa74cc636830f21f73b9139b8a716423-cc_ft_960.jpg',
+       'https://photos.zillowstatic.com/fp/bd407dc6068fd65b634d99f16106b69c-cc_ft_576.jpg',
+       'https://photos.zillowstatic.com/fp/566024a3b680713c1ab73798f5c318be-cc_ft_576.jpg'],
+  2:  ['https://photos.zillowstatic.com/fp/2fe1bcf1ee89bc0826477754068a8ebc-cc_ft_960.jpg',
+       'https://photos.zillowstatic.com/fp/8cca3db2f87609a1fcd7a81f498a77f6-cc_ft_576.jpg',
+       'https://photos.zillowstatic.com/fp/edb34d90c4ed2452bc8f2e34a91eada7-cc_ft_576.jpg'],
+  3:  ['https://photos.zillowstatic.com/fp/fbedd9e1f88538b8577a089ebc68eea9-cc_ft_960.jpg',
+       'https://photos.zillowstatic.com/fp/e1a0b02e78917b7353965c13a1ccbee4-cc_ft_576.jpg',
+       'https://photos.zillowstatic.com/fp/0d366b41327fa6ae2310f266cb9a3048-cc_ft_576.jpg'],
+  4:  ['https://photos.zillowstatic.com/fp/3d4398d8afc64538771181528a471f08-cc_ft_960.jpg',
+       'https://photos.zillowstatic.com/fp/880c7e605c2752947430769b1a97109d-cc_ft_576.jpg',
+       'https://photos.zillowstatic.com/fp/78cab9383c5c67b1e1329686fd86061a-cc_ft_576.jpg'],
+  5:  ['https://photos.zillowstatic.com/fp/310b4c659902b1623e0f71d82bcde9d6-cc_ft_960.jpg',
+       'https://photos.zillowstatic.com/fp/c52afeffd3e120312dab0dbbd252a535-cc_ft_576.jpg',
+       'https://photos.zillowstatic.com/fp/cb541b62fbb95c68fbb0157aee09f15e-cc_ft_576.jpg'],
+  6:  ['https://photos.zillowstatic.com/fp/5cd29d36fa353765872ac3f457c05f9f-cc_ft_960.jpg',
+       'https://photos.zillowstatic.com/fp/e6db6f9f336a75ddbb03ed8859af9225-cc_ft_576.jpg',
+       'https://photos.zillowstatic.com/fp/d82a30d9c187c91baccf7acc923682a9-cc_ft_576.jpg'],
+  7:  ['https://photos.zillowstatic.com/fp/d8db7d1a4fe979e98119434e2a611eae-cc_ft_960.jpg',
+       'https://photos.zillowstatic.com/fp/5838541093a2f75d7f2971d815e1f077-cc_ft_576.jpg',
+       'https://photos.zillowstatic.com/fp/3a3924703a7b6e5cc5084c2a74bc9958-cc_ft_576.jpg'],
+  8:  ['https://photos.zillowstatic.com/fp/46cd80ef67d2cfcae2dac24987b3dbaf-cc_ft_960.jpg',
+       'https://photos.zillowstatic.com/fp/94d0fd154dfe44146555db571985d0cf-cc_ft_576.jpg',
+       'https://photos.zillowstatic.com/fp/34c9a212932356625a4efd18c1485c01-cc_ft_576.jpg'],
+  9:  ['https://photos.zillowstatic.com/fp/02c4e2d5169d8182ebc3691452fdb7a1-cc_ft_960.jpg',
+       'https://photos.zillowstatic.com/fp/d318e15f00e06d998586d95fcfdf5634-cc_ft_576.jpg',
+       'https://photos.zillowstatic.com/fp/22faf1b7ae393a7d802805e7b397fef3-cc_ft_576.jpg'],
+  10: ['https://photos.zillowstatic.com/fp/4422183a43b5ad36a84c42da06efee8b-sc_1152_768.jpg',
+       'https://photos.zillowstatic.com/fp/b3f93fd4184ea9a8ceb1a85087cee615-sc_1152_768.jpg',
+       'https://photos.zillowstatic.com/fp/0b91bd285a1894581d6d4222289f1973-sc_1152_768.jpg'],
+};
+
 // ── MAP INIT ──────────────────────────────────────────────────────────────────
 const map = L.map('map', { zoomControl: true }).setView([27.840, -82.730], 12);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -292,9 +352,14 @@ function makePopup(h) {
   }
   const cutTag = h.cut ? `<span class="tag tag-cut">💰 Cut $${h.cut.toLocaleString()}</span>` : '';
   const stClass = h.statusTag === 'auction' ? 'tag-status-auction' : h.statusTag === 'new' ? 'tag-status-new' : 'tag-status-sale';
+  const pics = PHOTOS[h.num] || [];
+  const photoStrip = pics.length ? `<div class="photo-strip">${
+    pics.map(u => `<img src="${u}" onclick="openLB('${u}','${h.codename}')" loading="lazy">`).join('')
+  }</div>` : '';
   return `<div class="popup-wrap">
     <div class="popup-title">${h.num}. ${h.codename}</div>
     <div class="popup-addr">${h.addr}</div>
+    ${photoStrip}
     <div class="popup-grid">
       <span class="lbl">Price</span>   <span class="val">${fmt$(h.price)}</span>
       <span class="lbl">Est. Mo.</span><span class="val">${fmtMo(h.mo)}</span>
@@ -498,6 +563,18 @@ priceCtrl.onAdd = () => {
   return d;
 };
 priceCtrl.addTo(map);
+
+// ── LIGHTBOX ─────────────────────────────────────────────────────────────────
+function openLB(url, caption) {
+  document.getElementById('lb-img').src = url;
+  document.getElementById('lb-caption').textContent = caption || '';
+  document.getElementById('lb').classList.add('open');
+}
+function closeLB() {
+  document.getElementById('lb').classList.remove('open');
+  document.getElementById('lb-img').src = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLB(); });
 
 // Start with FL view
 zoomToFL(null);
