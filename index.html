@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏠 Reed Family House Hunt 2026</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy:  #1B3A6B;
+    --blue:  #2E5DA0;
+    --amber: #F59E0B;
+    --mint:  #10B981;
+    --pink:  #EF4444;
+    --gray:  #6B7280;
+    --light: #EBF3FC;
+    --white: #FFFFFF;
+    --shadow: 0 2px 12px rgba(0,0,0,.18);
+  }
+  body { font-family: Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; background: #f0f4f8; }
+
+  /* ── SIDEBAR ─────────────────────────────────────────────────────────────── */
+  #sidebar {
+    width: 340px; min-width: 300px; max-width: 400px;
+    display: flex; flex-direction: column;
+    background: var(--white); box-shadow: var(--shadow);
+    z-index: 1000; overflow: hidden;
+  }
+  #sidebar-header {
+    background: var(--navy); color: #fff;
+    padding: 14px 16px 10px;
+    flex-shrink: 0;
+  }
+  #sidebar-header h1 { font-size: 16px; font-weight: 700; line-height: 1.3; }
+  #sidebar-header p  { font-size: 11px; opacity: .75; margin-top: 4px; }
+
+  #filter-bar {
+    display: flex; gap: 6px; padding: 10px 12px;
+    background: var(--light); border-bottom: 1px solid #dce7f5;
+    flex-shrink: 0; flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 4px 10px; border-radius: 20px; border: 1.5px solid var(--navy);
+    background: var(--white); color: var(--navy); font-size: 11px; cursor: pointer;
+    font-weight: 600; transition: all .15s;
+  }
+  .filter-btn.active { background: var(--navy); color: #fff; }
+  .filter-btn:hover  { background: var(--navy); color: #fff; }
+
+  #card-list { overflow-y: auto; flex: 1; padding: 8px; }
+
+  .section-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--gray); padding: 8px 6px 4px; border-bottom: 1px solid #e5e7eb; margin-bottom: 4px;
+  }
+
+  .card {
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 6px;
+    cursor: pointer; border: 1.5px solid transparent;
+    transition: all .15s; background: #f8fafd;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .card:hover  { border-color: var(--blue); background: var(--light); }
+  .card.active { border-color: var(--navy); background: #dce7f7; }
+  .card.home-card { background: #f0fdf4; }
+  .card.mike-card { background: #eff6ff; }
+
+  .card-badge {
+    min-width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .card-body { flex: 1; min-width: 0; }
+  .card-name { font-size: 13px; font-weight: 700; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-addr { font-size: 11px; color: var(--gray); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-meta { display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
+  .tag {
+    font-size: 10px; padding: 2px 7px; border-radius: 10px;
+    font-weight: 600; white-space: nowrap;
+  }
+  .tag-price  { background: #dbeafe; color: #1e40af; }
+  .tag-mo     { background: #d1fae5; color: #065f46; }
+  .tag-beds   { background: #fce7f3; color: #9d174d; }
+  .tag-status-auction { background: #fef3c7; color: #92400e; }
+  .tag-status-new     { background: #d1fae5; color: #065f46; }
+  .tag-status-sale    { background: #dbeafe; color: #1e40af; }
+  .tag-cut    { background: #fee2e2; color: #991b1b; }
+
+  /* ── MAP ──────────────────────────────────────────────────────────────────── */
+  #map { flex: 1; height: 100vh; }
+
+  /* ── LEAFLET POPUP ────────────────────────────────────────────────────────── */
+  .popup-wrap { min-width: 220px; max-width: 280px; font-family: Arial, sans-serif; }
+  .popup-title { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
+  .popup-addr  { font-size: 11px; color: var(--gray); margin-bottom: 8px; }
+  .popup-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 11px; margin-bottom: 8px; }
+  .popup-grid .lbl { color: var(--gray); }
+  .popup-grid .val { font-weight: 700; color: #111; }
+  .popup-features { font-size: 10px; color: #555; background: #f5f7fa; border-radius: 5px; padding: 5px 7px; margin-bottom: 8px; line-height: 1.5; }
+  .popup-links { display: flex; gap: 6px; }
+  .popup-link {
+    flex: 1; text-align: center; padding: 5px 4px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; text-decoration: none; color: #fff;
+    background: var(--navy);
+  }
+  .popup-link.maps { background: var(--mint); }
+
+  /* ── CUSTOM MARKERS ───────────────────────────────────────────────────────── */
+  .num-marker {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff;
+    border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35);
+    cursor: pointer;
+  }
+  .home-marker { font-size: 22px; line-height: 1; filter: drop-shadow(0 2px 5px rgba(0,0,0,.4)); cursor: pointer; }
+
+  /* ── LEGEND ───────────────────────────────────────────────────────────────── */
+  .legend-box {
+    background: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 8px;
+    box-shadow: var(--shadow); font-size: 11px; line-height: 2;
+  }
+  .legend-box strong { display: block; margin-bottom: 4px; color: var(--navy); font-size: 12px; }
+  .leg-dot {
+    display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+    margin-right: 5px; vertical-align: middle; border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+
+  /* ── GA NOTICE ────────────────────────────────────────────────────────────── */
+  .ga-notice {
+    background: #fffbeb; border: 1.5px dashed var(--amber);
+    border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #92400e;
+    margin: 6px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ──────────────────────────────────────────────────────────────── -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>🏠 Reed Family House Hunt 2026</h1>
+    <p>10 properties · Pinellas County + Rockmart, GA · Click any card to zoom</p>
+  </div>
+
+  <div id="filter-bar">
+    <button class="filter-btn active" onclick="filterCards('all',this)">All</button>
+    <button class="filter-btn" onclick="filterCards('forsale',this)">For Sale</button>
+    <button class="filter-btn" onclick="filterCards('auction',this)">Auction/FC</button>
+    <button class="filter-btn" onclick="filterCards('new',this)">New Build</button>
+    <button class="filter-btn" onclick="zoomToFL(this)">📍 FL View</button>
+    <button class="filter-btn" onclick="zoomToAll(this)">🗺️ All</button>
+  </div>
+
+  <div id="card-list">
+    <!-- Filled by JS -->
+  </div>
+</div>
+
+<!-- ── MAP ──────────────────────────────────────────────────────────────────── -->
+<div id="map"></div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const HOMES = [
+  { id:'home', label:'You Are Here', addr:'6283 72nd Ave N #B, Pinellas Park FL 33781',
+    lat:27.8440, lng:-82.7478, color:'#10B981', icon:'🏡',
+    type:'home', price:null, mo:null, beds:null, features:'Current residence' },
+  { id:'mike', label:"Mike's Place",  addr:'408 Imperial Palm Dr, Largo FL 33777',
+    lat:27.8894, lng:-82.7760, color:'#3B82F6', icon:'🏘️',
+    type:'mike', price:null, mo:null, beds:null, features:'Family friend' },
+];
+
+const HOUSES = [
+  { num:1,  codename:"Grandma's",    addr:'350 Vinson Mountain Loop, Rockmart, GA 30153',
+    lat:34.0012, lng:-85.0449, color:'#F59E0B',
+    status:'Auction/Foreclosure', statusTag:'auction',
+    price:233600, mo:null,  beds:3, baths:2, isqft:1092, lotsqft:'0.97 ac',
+    cut:null,
+    features:'Foreclosure / Auction  ·  0.97-acre lot  ·  Grandma\'s sentimental fav ❤️',
+    zurl:'https://www.zillow.com/homedetails/350-Vinson-Mountain-Loop-Rockmart-GA-30153/237715226_zpid/',
+    murl:'https://maps.google.com/?q=350+Vinson+Mountain+Loop,Rockmart,GA' },
+
+  { num:2,  codename:'99th Terrace', addr:'5261 99th Ter N, Pinellas Park FL 33782',
+    lat:27.8632, lng:-82.7533, color:'#6366F1',
+    status:'For Sale', statusTag:'forsale',
+    price:250000, mo:2112, beds:3, baths:1, isqft:864,  lotsqft:'8,394 sf',
+    cut:5000,
+    features:'Spacious lot · Modern cabinetry · Brand-new flooring · All-new appliances',
+    zurl:'https://www.zillow.com/homedetails/5261-99th-Ter-N-Pinellas-Park-FL-33782/444129147_zpid/',
+    murl:'https://maps.google.com/?q=5261+99th+Ter+N,Pinellas+Park,FL' },
+
+  { num:3,  codename:'Harper',       addr:'Harper Plan, Pinellas Co. Spot Lots, Pinellas Park FL 33781',
+    lat:27.8430, lng:-82.7245, color:'#10B981',
+    status:'New Construction', statusTag:'new',
+    price:444000, mo:null, beds:4, baths:2, isqft:1665, lotsqft:'TBD',
+    cut:null,
+    features:'Brand-new 2026 build · Buildable plan · 4 bed / 2 bath',
+    zurl:'https://www.zillow.com/community/pinellas-county-spot-lots/461028354_zpid/',
+    murl:'https://maps.google.com/?q=Pinellas+Park,FL+33781' },
+
+  { num:4,  codename:'67th Way',     addr:'8858 67th Way, Pinellas Park FL 33782',
+    lat:27.8358, lng:-82.7441, color:'#EF4444',
+    status:'Pre-Foreclosure/Auction', statusTag:'auction',
+    price:275000, mo:null, beds:4, baths:2, isqft:1609, lotsqft:'6,421 sf',
+    cut:null,
+    features:'Two storage buildings · Screened rear patio · Large functional layout',
+    zurl:'https://www.zillow.com/homedetails/8858-67th-Way-Pinellas-Park-FL-33782/47123076_zpid/',
+    murl:'https://maps.google.com/?q=8858+67th+Way,Pinellas+Park,FL' },
+
+  { num:5,  codename:'Paris Ave',    addr:'827 Paris Ave S, Saint Petersburg FL 33701',
+    lat:27.7572, lng:-82.6652, color:'#8B5CF6',
+    status:'For Sale', statusTag:'forsale',
+    price:335000, mo:2888, beds:5, baths:2, isqft:1908, lotsqft:'—',
+    cut:15000,
+    features:'Most bedrooms (5) · Duplex / multi-family · Price cut $15K',
+    zurl:'https://www.zillow.com/homedetails/827-Paris-Ave-S-Saint-Petersburg-FL-33701/81387159_zpid/',
+    murl:'https://maps.google.com/?q=827+Paris+Ave+S,Saint+Petersburg,FL' },
+
+  { num:6,  codename:'38th Ave',     addr:'7300 38th Ave N, Saint Petersburg FL 33710',
+    lat:27.8218, lng:-82.7138, color:'#1B3A6B',
+    status:'For Sale', statusTag:'forsale',
+    price:349900, mo:2958, beds:4, baths:2, isqft:1187, lotsqft:'7,545 sf',
+    cut:10000,
+    features:'Oversized backyard · Tile flooring throughout · Price cut $10K',
+    zurl:'https://www.zillow.com/homedetails/7300-38th-Ave-N-Saint-Petersburg-FL-33710/47012053_zpid/',
+    murl:'https://maps.google.com/?q=7300+38th+Ave+N,Saint+Petersburg,FL' },
+
+  { num:7,  codename:'83rd Ave',     addr:'1570 83rd Ave N, Saint Petersburg FL 33702',
+    lat:27.8469, lng:-82.7036, color:'#0EA5E9',
+    status:'For Sale', statusTag:'forsale',
+    price:384900, mo:3227, beds:4, baths:2, isqft:1423, lotsqft:'10,145 sf',
+    cut:11000,
+    features:'Largest lot in lineup (10,145 sf) · Price cut $11K',
+    zurl:'https://www.zillow.com/homedetails/1570-83rd-Ave-N-Saint-Petersburg-FL-33702/47178253_zpid/',
+    murl:'https://maps.google.com/?q=1570+83rd+Ave+N,Saint+Petersburg,FL' },
+
+  { num:8,  codename:'43rd Ave',     addr:'4024 43rd Ave N, Saint Petersburg FL 33714',
+    lat:27.8264, lng:-82.6858, color:'#F97316',
+    status:'For Sale', statusTag:'forsale',
+    price:365000, mo:3060, beds:4, baths:2, isqft:1435, lotsqft:'6,350 sf',
+    cut:5000,
+    features:'Flexible floor plan · Vinyl flooring · Solar panels · Price cut $5K',
+    zurl:'https://www.zillow.com/homedetails/4024-43rd-Ave-N-Saint-Petersburg-FL-33714/46966494_zpid/',
+    murl:'https://maps.google.com/?q=4024+43rd+Ave+N,Saint+Petersburg,FL' },
+
+  { num:9,  codename:'78th Ave',     addr:'6896 78th Ave N, Pinellas Park FL 33781',
+    lat:27.8421, lng:-82.7450, color:'#BE185D',
+    status:'For Sale', statusTag:'forsale',
+    price:345000, mo:2915, beds:4, baths:2, isqft:1648, lotsqft:'6,599 sf',
+    cut:null,
+    features:'Brand-new HVAC · Largest interior sqft among SFRs · Near current home',
+    zurl:'https://www.zillow.com/homedetails/6896-78th-Ave-N-Pinellas-Park-FL-33781/47225059_zpid/',
+    murl:'https://maps.google.com/?q=6896+78th+Ave+N,Pinellas+Park,FL' },
+
+  { num:10, codename:'Walsingham',   addr:'11333 Walsingham Rd, Seminole FL 33778',
+    lat:27.8758, lng:-82.8031, color:'#64748B',
+    status:'For Sale', statusTag:'forsale',
+    price:325900, mo:2188, beds:4, baths:2, isqft:1167, lotsqft:'6,861 sf',
+    cut:9000,
+    features:'New toilets · Fresh paint · New electrical panel · New vinyl floors · Garage',
+    zurl:'https://www.zillow.com/homedetails/11333-Walsingham-Rd-Seminole-FL-33778/47033349_zpid/',
+    murl:'https://maps.google.com/?q=11333+Walsingham+Rd,Seminole,FL' },
+];
+
+// ── MAP INIT ──────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([27.840, -82.730], 12);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 20
+}).addTo(map);
+
+// ── MARKER CREATION ───────────────────────────────────────────────────────────
+const markers = {};
+const cardEls  = {};
+
+function fmt$(n) { return n ? '$' + n.toLocaleString() : '—'; }
+function fmtMo(n) { return n ? '$' + n.toLocaleString() + '/mo' : '—'; }
+
+function makePopup(h) {
+  const isHouse = h.num !== undefined;
+  if (!isHouse) {
+    return `<div class="popup-wrap">
+      <div class="popup-title">${h.icon} ${h.label}</div>
+      <div class="popup-addr">${h.addr}</div>
+      <div class="popup-features">${h.features}</div>
+    </div>`;
+  }
+  const cutTag = h.cut ? `<span class="tag tag-cut">💰 Cut $${h.cut.toLocaleString()}</span>` : '';
+  const stClass = h.statusTag === 'auction' ? 'tag-status-auction' : h.statusTag === 'new' ? 'tag-status-new' : 'tag-status-sale';
+  return `<div class="popup-wrap">
+    <div class="popup-title">${h.num}. ${h.codename}</div>
+    <div class="popup-addr">${h.addr}</div>
+    <div class="popup-grid">
+      <span class="lbl">Price</span>   <span class="val">${fmt$(h.price)}</span>
+      <span class="lbl">Est. Mo.</span><span class="val">${fmtMo(h.mo)}</span>
+      <span class="lbl">Beds/Bath</span><span class="val">${h.beds}bd / ${h.baths}ba</span>
+      <span class="lbl">Interior</span><span class="val">${h.isqft ? h.isqft.toLocaleString() + ' sf' : '—'}</span>
+      <span class="lbl">Lot</span>     <span class="val">${h.lotsqft}</span>
+      <span class="lbl">Status</span>  <span class="val"><span class="tag ${stClass}">${h.status}</span></span>
+    </div>
+    ${cutTag ? `<div style="margin-bottom:6px">${cutTag}</div>` : ''}
+    <div class="popup-features">${h.features}</div>
+    <div class="popup-links">
+      <a class="popup-link" href="${h.zurl}" target="_blank">🏠 Zillow</a>
+      <a class="popup-link maps" href="${h.murl}" target="_blank">📍 Maps</a>
+    </div>
+  </div>`;
+}
+
+function numIcon(h) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="num-marker" style="background:${h.color}">${h.num}</div>`,
+    iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -18]
+  });
+}
+function homeIcon(h) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="home-marker">${h.icon}</div>`,
+    iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -16]
+  });
+}
+
+// Place home markers
+HOMES.forEach(h => {
+  const m = L.marker([h.lat, h.lng], { icon: homeIcon(h) })
+    .bindPopup(makePopup(h), { maxWidth: 290 })
+    .addTo(map);
+  markers[h.id] = m;
+});
+
+// Place house markers
+HOUSES.forEach(h => {
+  const m = L.marker([h.lat, h.lng], { icon: numIcon(h) })
+    .bindPopup(makePopup(h), { maxWidth: 290 })
+    .addTo(map);
+  markers['h' + h.num] = m;
+});
+
+// ── SIDEBAR CARDS ─────────────────────────────────────────────────────────────
+const list = document.getElementById('card-list');
+
+function addSectionLabel(text) {
+  const d = document.createElement('div');
+  d.className = 'section-label';
+  d.textContent = text;
+  list.appendChild(d);
+}
+
+function addGANotice() {
+  const d = document.createElement('div');
+  d.className = 'ga-notice';
+  d.innerHTML = '⚠️  Grandma\'s is in <strong>Rockmart, GA</strong> — use "🗺️ All" to see it on the map';
+  list.appendChild(d);
+}
+
+function makeCard(h) {
+  const isHouse = h.num !== undefined;
+  const card = document.createElement('div');
+  const id   = isHouse ? 'h' + h.num : h.id;
+
+  card.className = 'card' + (!isHouse ? (h.id === 'home' ? ' home-card' : ' mike-card') : '');
+  card.dataset.status = isHouse ? h.statusTag : 'family';
+  card.dataset.id = id;
+
+  if (!isHouse) {
+    card.innerHTML = `
+      <div class="card-badge" style="background:${h.color};font-size:18px">${h.icon}</div>
+      <div class="card-body">
+        <div class="card-name">${h.label}</div>
+        <div class="card-addr">${h.addr}</div>
+      </div>`;
+  } else {
+    const stClass = h.statusTag === 'auction' ? 'tag-status-auction' : h.statusTag === 'new' ? 'tag-status-new' : 'tag-status-sale';
+    const cutTag  = h.cut ? `<span class="tag tag-cut">-$${h.cut.toLocaleString()}</span>` : '';
+    card.innerHTML = `
+      <div class="card-badge" style="background:${h.color}">${h.num}</div>
+      <div class="card-body">
+        <div class="card-name">${h.codename}</div>
+        <div class="card-addr">${h.addr}</div>
+        <div class="card-meta">
+          <span class="tag tag-price">${fmt$(h.price)}</span>
+          ${h.mo ? `<span class="tag tag-mo">${fmtMo(h.mo)}</span>` : ''}
+          <span class="tag tag-beds">${h.beds}bd/${h.baths}ba · ${h.isqft ? h.isqft.toLocaleString() + 'sf' : '—'}</span>
+          <span class="tag ${stClass}">${h.status}</span>
+          ${cutTag}
+        </div>
+      </div>`;
+  }
+
+  card.addEventListener('click', () => {
+    // Deactivate all
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    // Zoom + popup
+    const m = markers[id];
+    if (m) {
+      if (h.num === 1) { // GA - zoom out first
+        map.setView([m.getLatLng()], 14, { animate: true });
+      } else {
+        map.setView([m.getLatLng()], 16, { animate: true });
+      }
+      setTimeout(() => m.openPopup(), 400);
+    }
+  });
+
+  cardEls[id] = card;
+  return card;
+}
+
+addSectionLabel('📍 Family Locations');
+HOMES.forEach(h => list.appendChild(makeCard(h)));
+
+addSectionLabel('🏠 Properties (10 total)');
+addGANotice();
+HOUSES.forEach(h => list.appendChild(makeCard(h)));
+
+// ── FILTER LOGIC ──────────────────────────────────────────────────────────────
+function filterCards(filter, btn) {
+  if (btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  if (filter === 'all' || filter === 'fl' || filter === 'ga') {
+    document.querySelectorAll('.card').forEach(c => c.style.display = '');
+    return;
+  }
+  document.querySelectorAll('.card').forEach(c => {
+    const show = c.dataset.status === filter || c.dataset.status === 'family';
+    c.style.display = show ? '' : 'none';
+  });
+  // Show/hide markers
+  HOUSES.forEach(h => {
+    const m = markers['h' + h.num];
+    if (filter === 'all' || h.statusTag === filter) {
+      if (!map.hasLayer(m)) map.addLayer(m);
+    } else {
+      if (map.hasLayer(m)) map.removeLayer(m);
+    }
+  });
+}
+
+function zoomToFL(btn) {
+  if (btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  map.fitBounds([
+    [27.70, -82.85],
+    [27.92, -82.62]
+  ], { padding: [30, 30] });
+}
+
+function zoomToAll(btn) {
+  if (btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  map.fitBounds([
+    [27.70, -85.10],
+    [34.10, -82.62]
+  ], { padding: [30, 30] });
+}
+
+// ── LEGEND ────────────────────────────────────────────────────────────────────
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = () => {
+  const d = L.DomUtil.create('div', 'legend-box');
+  d.innerHTML = `
+    <strong>LEGEND</strong>
+    <div><span class="leg-dot" style="background:#10B981"></span> Current Home (You)</div>
+    <div><span class="leg-dot" style="background:#3B82F6"></span> Mike's Place</div>
+    <div><span class="leg-dot" style="background:#6366F1"></span> For Sale</div>
+    <div><span class="leg-dot" style="background:#EF4444"></span> Foreclosure/Auction</div>
+    <div><span class="leg-dot" style="background:#10B981"></span> New Construction</div>
+    <div><span class="leg-dot" style="background:#F59E0B"></span> Grandma's (GA) ❤️</div>`;
+  return d;
+};
+legend.addTo(map);
+
+// ── PRICE RANGE CONTROL ────────────────────────────────────────────────────────
+const priceCtrl = L.control({ position: 'topright' });
+priceCtrl.onAdd = () => {
+  const d = L.DomUtil.create('div', 'legend-box');
+  d.style.maxWidth = '200px';
+  const rows = HOUSES.slice().sort((a,b) => a.price - b.price)
+    .map(h => `<div style="display:flex;align-items:center;gap:6px;line-height:1.8">
+      <span class="leg-dot" style="background:${h.color}"></span>
+      <strong>${h.num}. ${h.codename}</strong> — ${fmt$(h.price)}
+    </div>`).join('');
+  d.innerHTML = `<strong>PRICE RANGE</strong>${rows}`;
+  return d;
+};
+priceCtrl.addTo(map);
+
+// Start with FL view
+zoomToFL(null);
+</script>
+</body>
+</html>
